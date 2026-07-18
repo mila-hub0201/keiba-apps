@@ -1,0 +1,5 @@
+node_modules/
+__pycache__/
+verify_work/
+pdf_work/
+_test*.pdf
