@@ -472,6 +472,30 @@ async function loadDemo() {
   }
 }
 
+/** 共有メニュー経由で受け取ったPDF(sw.jsが一時キャッシュに置く)を取り込む。 */
+async function consumeSharedPdf() {
+  if (!new URLSearchParams(location.search).has("share-target")) return;
+  history.replaceState(null, "", "./"); // クエリを消して通常起動と同じURLに戻す
+  try {
+    const cache = await caches.open("umafull-share");
+    const res = await cache.match("shared-pdf");
+    if (res) {
+      const buf = await res.arrayBuffer();
+      await cache.delete("shared-pdf");
+      await loadPdf(buf);
+      return;
+    }
+    const miss = await cache.match("shared-miss");
+    if (miss) {
+      await cache.delete("shared-miss");
+      const errorBox = $("error-box");
+      errorBox.textContent = "共有からPDFファイルを受け取れませんでした。" +
+        "リンク(URL)の共有ではなく、PDFを保存してから「ファイル」アプリ等でPDF自体を共有してください。";
+      errorBox.hidden = false;
+    }
+  } catch { /* 共有の取り込み失敗時は通常の起動画面のまま */ }
+}
+
 function reset() {
   state.entries = null;
   state.paddock = {};
@@ -544,6 +568,8 @@ function setup() {
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js").catch(() => { /* オフライン化は任意 */ });
   }
+
+  consumeSharedPdf();
 }
 
 setup();

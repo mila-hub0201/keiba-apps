@@ -32,9 +32,30 @@ self.addEventListener("activate", (e) => {
   );
 });
 
-// ネット優先・失敗時キャッシュ。オンライン時は常に最新版が届き、
-// 圏外(競馬場の地下など)ではキャッシュで動く
+// Android の共有メニューから受け取ったPDFを一時キャッシュに置き、
+// アプリ本体(?share-target=1)にリダイレクトして渡す
+const SHARE_CACHE = "umafull-share";
+
 self.addEventListener("fetch", (e) => {
+  const url = new URL(e.request.url);
+  if (e.request.method === "POST" && url.pathname.endsWith("/share-target")) {
+    e.respondWith((async () => {
+      try {
+        const formData = await e.request.formData();
+        const file = formData.get("pdf");
+        const cache = await caches.open(SHARE_CACHE);
+        if (file && file.size > 0) {
+          await cache.put("shared-pdf",
+            new Response(file, { headers: { "Content-Type": "application/pdf" } }));
+        } else {
+          // PDFファイルではなくURL/テキストだけ共有されたケースの目印
+          await cache.put("shared-miss", new Response("1"));
+        }
+      } catch { /* 受け取れなくてもアプリは開く */ }
+      return Response.redirect(new URL("./?share-target=1", self.registration.scope), 303);
+    })());
+    return;
+  }
   if (e.request.method !== "GET") return;
   e.respondWith(
     fetch(e.request)
