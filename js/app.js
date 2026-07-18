@@ -22,6 +22,7 @@ const state = {
   score: null,
   mark: null,
   bet: null,
+  tableBuilt: false, // 採点表を構築済みか(再計算時は差分更新に留める)
 };
 
 // ---------------------------------------------------------------- 計算と再描画
@@ -45,9 +46,17 @@ function recompute() {
 
 function render() {
   renderRace();
-  renderScore();
+  // 採点表の再構築は初回のみ。再計算時はボタン状態だけ差し替えて
+  // 入力中のフォーカスやスクロール位置を壊さない
+  if (!state.tableBuilt) {
+    renderScore();
+    state.tableBuilt = true;
+  } else {
+    updateScoreControls();
+  }
   renderMark();
   renderBet();
+  renderSummaryBar();
   for (const id of ["race-card", "score-card", "mark-card", "bet-settings-card", "bet-card"]) {
     $(id).hidden = false;
   }
@@ -90,6 +99,8 @@ function renderScore() {
   for (const h of state.score.horses) {
     const s = h.scores;
     const tr = document.createElement("tr");
+    tr.dataset.num = h.num;
+    tr.dataset.name = h.name;
     if (top3.has(h.num)) tr.classList.add("top3");
 
     const oddsInput = document.createElement("input");
@@ -105,13 +116,9 @@ function renderScore() {
       if (e) { e.odds = oddsInput.value.trim(); recompute(); }
     });
 
-    const padMark = state.paddock[h.num] ?? "";
     const padBtn = document.createElement("button");
     padBtn.type = "button";
-    padBtn.className = "pad-btn" + (padMark ? " active" : "");
-    padBtn.textContent = padMark || "－";
-    padBtn.setAttribute("aria-label",
-      `${h.num}番${h.name}のパドック評価: ${PAD_NAMES[padMark]}。押すと次の評価に切り替え`);
+    padBtn.className = "pad-btn";
     padBtn.addEventListener("click", () => {
       const cur = PAD_CYCLE.indexOf(state.paddock[h.num] ?? "");
       const next = PAD_CYCLE[(cur + 1) % PAD_CYCLE.length];
@@ -142,6 +149,22 @@ function renderScore() {
 
   $("rank-line").textContent = "【合計順位】" +
     order.map((h, i) => `${i + 1}位:${h.num}番(${h.total}点)`).join(" ");
+
+  updateScoreControls();
+}
+
+/** 再計算時の差分更新: パドックボタンの表示状態だけを書き換える。 */
+function updateScoreControls() {
+  for (const tr of document.querySelectorAll("#score-table tbody tr")) {
+    const num = Number(tr.dataset.num);
+    const mark = state.paddock[num] ?? "";
+    const btn = tr.querySelector(".pad-btn");
+    if (!btn) continue;
+    btn.textContent = mark || "－";
+    btn.classList.toggle("active", Boolean(mark));
+    btn.setAttribute("aria-label",
+      `${num}番${tr.dataset.name}のパドック評価: ${PAD_NAMES[mark]}。押すと次の評価に切り替え`);
+  }
 }
 
 function renderMark() {
@@ -204,6 +227,18 @@ function renderBet() {
   }
   body.appendChild(stats);
 
+  // 結末の2分岐: 利得と全損リスクを同じ視覚的重みで提示する
+  const outcome = document.createElement("div");
+  outcome.className = "outcome-grid";
+  outcome.innerHTML =
+    `<div class="outcome win"><span class="oc-label">候補${bet.bets.length}頭のどれかが1着</span>` +
+    `<span class="oc-value">+${fmtYen(bet.min_profit)}以上</span>` +
+    `<span class="oc-sub">回収率 ${Math.round(bet.min_roi * 100)}〜${Math.round(bet.max_roi * 100)}%</span></div>` +
+    `<div class="outcome lose"><span class="oc-label">候補外の馬が1着</span>` +
+    `<span class="oc-value">−${fmtYen(bet.total)}</span>` +
+    `<span class="oc-sub">投資額の全損</span></div>`;
+  body.appendChild(outcome);
+
   if (bet.missing?.length) {
     const p = document.createElement("p");
     p.className = "bet-note";
@@ -245,21 +280,38 @@ function renderBet() {
   totalLine.textContent = `投資合計 ${fmtYen(bet.total)} / 候補${bet.bets.length}頭 / 自信度${bet.confidence}`;
   body.appendChild(totalLine);
 
-  const guarantee = document.createElement("p");
-  guarantee.className = "bet-note";
-  guarantee.textContent =
-    `→ 候補のどれが勝っても +${fmtYen(bet.min_profit)}以上` +
-    `(回収率 ${Math.round(bet.min_roi * 100)}%〜${Math.round(bet.max_roi * 100)}%)。` +
-    `候補外の馬が勝てば −${fmtYen(bet.total)}(全損)。`;
-  body.appendChild(guarantee);
-
   const caution = document.createElement("p");
   caution.className = "bet-caution";
   caution.textContent = "【注意】" + betCaution(bet) +
-    `「どの馬が勝っても勝ち越す」は「買った${bet.bets.length}頭のどれかが勝てば」の意味です。` +
-    `アービトラージではなく、この${bet.bets.length}頭から1着が出る確率が` +
+    `この${bet.bets.length}頭から1着が出る確率が` +
     `${Math.round(bet.breakeven_hit * 100)}%を超えなければ長期では負けます。的中を保証するものではありません。`;
   body.appendChild(caution);
+}
+
+/** 下部固定バー: 投資合計と保証額を常時表示し、タップで買い目へ移動。 */
+function renderSummaryBar() {
+  const bar = $("summary-bar");
+  const bet = state.bet;
+  bar.hidden = false;
+  document.body.classList.add("has-bar");
+  $("sb-info").textContent = bet.skip
+    ? "買い目: 見送り(0円)"
+    : `投資 ${fmtYen(bet.total)} / 的中なら +${fmtYen(bet.min_profit)}〜`;
+  updateSummaryBarVisibility();
+}
+
+function hideSummaryBar() {
+  $("summary-bar").hidden = true;
+  document.body.classList.remove("has-bar");
+}
+
+/** 買い目カードが画面内にあるときだけバーを引っ込める。 */
+function updateSummaryBarVisibility() {
+  const card = $("bet-card");
+  if (card.hidden || $("summary-bar").hidden) return;
+  const r = card.getBoundingClientRect();
+  const visible = r.top < window.innerHeight * 0.85 && r.bottom > 120;
+  $("summary-bar").classList.toggle("sb-away", visible);
 }
 
 function escapeHtml(s) {
@@ -323,6 +375,7 @@ async function loadPdf(arrayBuffer) {
     state.entries = entries;
     state.raceMd = raceMd;
     state.paddock = {};
+    state.tableBuilt = false;
     recompute();
   } catch (err) {
     errorBox.textContent = `読み込みに失敗しました: ${err.message}`;
@@ -343,6 +396,7 @@ async function loadDemo() {
     state.entries = entriesText.split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l));
     state.raceMd = raceMd;
     state.paddock = {};
+    state.tableBuilt = false;
     recompute();
   } catch (err) {
     errorBox.textContent = `デモデータの読み込みに失敗しました: ${err.message}`;
@@ -353,12 +407,14 @@ async function loadDemo() {
 function reset() {
   state.entries = null;
   state.paddock = {};
+  state.tableBuilt = false;
   for (const id of ["race-card", "score-card", "mark-card", "bet-settings-card", "bet-card"]) {
     $(id).hidden = true;
   }
   $("result-actions").hidden = true;
   $("upload-card").hidden = false;
   $("file-input").value = "";
+  hideSummaryBar();
 }
 
 function setup() {
@@ -398,6 +454,13 @@ function setup() {
       alert("コピーに失敗しました");
     }
   });
+
+  // 下部バー: タップで買い目へ移動。買い目カードが画面内にある間は自動で隠す
+  $("sb-goto").addEventListener("click", () => {
+    $("bet-card").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+  window.addEventListener("scroll", updateSummaryBarVisibility, { passive: true });
+  window.addEventListener("resize", updateSummaryBarVisibility, { passive: true });
 
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js").catch(() => { /* オフライン化は任意 */ });

@@ -176,10 +176,32 @@ table.dense th, table.dense td {
 }
 table.dense td.amount { text-align: right; }
 table.dense th {
-  background: var(--accent-soft);
+  /* stickyセルは下の内容が透けないよう不透明色にする */
+  background: color-mix(in srgb, var(--accent) 10%, var(--card));
   font-weight: 600;
+}
+
+/* 馬番・馬名列を左固定: 横スクロール中も行の同定を可能にする */
+table.dense th:nth-child(1), table.dense td:nth-child(1) {
   position: sticky;
-  top: 0;
+  left: 0;
+  z-index: 2;
+  background: var(--card);
+  min-width: 40px;
+}
+table.dense th:nth-child(2), table.dense td:nth-child(2) {
+  position: sticky;
+  left: 56px; /* 馬番列の幅(min-width 40px + padding 16px) */
+  z-index: 2;
+  background: var(--card);
+  box-shadow: 2px 0 0 var(--line);
+}
+table.dense th:nth-child(-n+2) {
+  background: color-mix(in srgb, var(--accent) 10%, var(--card));
+  z-index: 3;
+}
+table.dense tr.top3 td:nth-child(-n+2) {
+  background: color-mix(in srgb, var(--accent) 7%, var(--card));
 }
 table.dense td.name { text-align: left; font-weight: 600; }
 table.dense td.total { font-weight: 700; color: var(--accent-strong); }
@@ -301,6 +323,32 @@ table.dense tr.top3 td { background: color-mix(in srgb, var(--accent) 7%, transp
 }
 .stat .stat-label { font-size: 0.68rem; color: var(--text-sub); display: block; }
 .stat .stat-value { font-size: 1.05rem; font-weight: 700; color: var(--accent-strong); }
+/* 結末2分岐カード: 利得と全損リスクを同じ重みで見せる */
+.outcome-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.outcome {
+  border-radius: 10px;
+  padding: 10px 12px;
+  border-left: 4px solid;
+}
+.outcome.win {
+  border-color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 10%, transparent);
+}
+.outcome.lose {
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+.oc-label { font-size: 0.72rem; color: var(--text-sub); display: block; }
+.oc-value { font-size: 1.15rem; font-weight: 700; display: block; font-variant-numeric: tabular-nums; }
+.outcome.win .oc-value { color: var(--ok); }
+.outcome.lose .oc-value { color: var(--danger); }
+.oc-sub { font-size: 0.72rem; color: var(--text-sub); }
+
 .bet-note { font-size: 0.78rem; color: var(--text-sub); margin: 10px 0 0; }
 .bet-caution {
   font-size: 0.78rem;
@@ -346,6 +394,36 @@ table.dense tr.top3 td { background: color-mix(in srgb, var(--accent) 7%, transp
   color: var(--accent-strong);
   border-color: var(--line);
 }
+
+/* ── 下部固定サマリーバー ── */
+.summary-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 8px 14px calc(8px + env(safe-area-inset-bottom));
+  background: color-mix(in srgb, var(--card) 94%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-top: 1px solid var(--line);
+  transition: transform 0.2s ease;
+}
+.summary-bar.sb-away { transform: translateY(110%); }
+.sb-info {
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.sb-btn { flex: none; padding: 10px 16px; }
+/* バー表示中は最下部のコンテンツが隠れないよう余白を足す */
+body.has-bar { padding-bottom: calc(env(safe-area-inset-bottom) + 68px); }
 
 /* ── フッター ── */
 .app-footer {
