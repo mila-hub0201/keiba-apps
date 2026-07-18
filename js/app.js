@@ -42,6 +42,55 @@ function recompute() {
   state.mark = computeMark(state.score, paddockString());
   state.bet = computeBet(state.mark, Math.max(maxTotal, MIN_TOTAL), minComposite);
   render();
+  announce(state.bet.skip
+    ? "再計算しました。買い目は見送りです"
+    : `再計算しました。買い目${state.bet.bets.length}頭、投資合計${state.bet.total}円`);
+  saveSession();
+}
+
+/** スクリーンリーダー向けに状態変化を通知する。 */
+function announce(msg) {
+  $("live-status").textContent = msg;
+}
+
+// ---------------------------------------------------------------- 前回レースの保存・復元
+
+const STORE_KEY = "umafull:last";
+
+function saveSession() {
+  try {
+    const r = state.score.race;
+    localStorage.setItem(STORE_KEY, JSON.stringify({
+      entries: state.entries,
+      raceMd: state.raceMd,
+      paddock: state.paddock,
+      maxTotal: $("max-total").value,
+      minComposite: $("min-composite").value,
+      savedAt: Date.now(),
+      label: `${r.venue}${r.race_number ? r.race_number + "R" : ""} ${r.surface}${r.distance ?? ""}m ${r.headcount}頭`,
+    }));
+  } catch { /* プライベートモードや容量超過では保存しない */ }
+}
+
+function loadSavedSession() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function restoreSession() {
+  const saved = loadSavedSession();
+  if (!saved) return;
+  state.entries = saved.entries;
+  state.raceMd = saved.raceMd;
+  state.paddock = saved.paddock ?? {};
+  state.tableBuilt = false;
+  $("max-total").value = saved.maxTotal ?? 3000;
+  $("min-composite").value = saved.minComposite ?? "1.10";
+  recompute();
 }
 
 function render() {
@@ -84,20 +133,27 @@ function renderRace() {
 const PAD_CYCLE = ["", "◎", "〇", "▲", "△"];
 const PAD_NAMES = { "": "指定なし", "◎": "本命", "〇": "対抗", "▲": "単穴", "△": "連下" };
 
+// 各採点項目の最大値(ヒートマップの正規化用)
+const SCORE_MAXES = { style: 6, dist: 2, cond: 3, recent: 3, last3f: 3, adjust: 1 };
+
 function renderScore() {
   const table = $("score-table");
   table.innerHTML = "";
+  table.insertAdjacentHTML("afterbegin",
+    '<caption class="visually-hidden">採点表: 各馬のスコア内訳・単勝オッズ・パドック評価</caption>');
   const thead = document.createElement("thead");
-  thead.innerHTML = "<tr><th>馬番</th><th>馬名</th><th>人気</th><th>単勝</th><th>脚質</th>" +
-    "<th>距離</th><th>同条件</th><th>近走</th><th>上がり</th><th>補正</th><th>合計</th><th>パドック</th></tr>";
+  thead.innerHTML = '<tr><th scope="col">馬番</th><th scope="col">馬名</th><th scope="col">順位</th>' +
+    '<th scope="col">人気</th><th scope="col">単勝</th><th scope="col">脚質</th><th scope="col">距離</th>' +
+    '<th scope="col">同条件</th><th scope="col">近走</th><th scope="col">上がり</th><th scope="col">補正</th>' +
+    '<th scope="col">合計</th><th scope="col">パドック</th></tr>';
   table.appendChild(thead);
 
   const tbody = document.createElement("tbody");
   const order = rankedOrder(state.score.horses);
+  const rankMap = new Map(order.map((h, i) => [h.num, i + 1]));
   const top3 = new Set(order.slice(0, 3).map((h) => h.num));
 
   for (const h of state.score.horses) {
-    const s = h.scores;
     const tr = document.createElement("tr");
     tr.dataset.num = h.num;
     tr.dataset.name = h.name;
@@ -127,28 +183,32 @@ function renderScore() {
       recompute();
     });
 
-    const cells = [
-      `<td>${h.num}</td>`,
-      `<td class="name">${escapeHtml(h.name)}</td>`,
-      `<td>${fmtPop(h.popularity)}</td>`,
-    ];
-    tr.innerHTML = cells.join("");
+    // ヒートマップセル: 項目ごとの最大値で正規化した濃淡を敷く
+    const scoreCell = (key) => {
+      const v = h.scores[key];
+      const ratio = Math.max(v, 0) / SCORE_MAXES[key];
+      return `<td class="score-cell${v < 0 ? " neg" : ""}" style="--v:${ratio.toFixed(2)}">${v}</td>`;
+    };
+    const rank = rankMap.get(h.num);
+    tr.innerHTML =
+      `<th scope="row">${h.num}</th>` +
+      `<td class="name">${escapeHtml(h.name)}<span class="style-tag">${h.run_style}</span></td>` +
+      `<td class="rank${top3.has(h.num) ? " rank-top" : ""}">${rank}</td>` +
+      `<td>${fmtPop(h.popularity)}</td>`;
     const oddsTd = document.createElement("td");
     oddsTd.appendChild(oddsInput);
     tr.appendChild(oddsTd);
     tr.insertAdjacentHTML("beforeend",
-      `<td>${s.style}<small>(${h.run_style})</small></td>` +
-      `<td>${s.dist}</td><td>${s.cond}</td><td>${s.recent}</td>` +
-      `<td>${s.last3f}</td><td>${s.adjust}</td><td class="total">${h.total}</td>`);
+      scoreCell("style") + scoreCell("dist") + scoreCell("cond") +
+      scoreCell("recent") + scoreCell("last3f") + scoreCell("adjust") +
+      `<td class="total">${h.total}${top3.has(h.num)
+        ? '<span aria-hidden="true">★</span><span class="visually-hidden">(上位3頭)</span>' : ""}</td>`);
     const padTd = document.createElement("td");
     padTd.appendChild(padBtn);
     tr.appendChild(padTd);
     tbody.appendChild(tr);
   }
   table.appendChild(tbody);
-
-  $("rank-line").textContent = "【合計順位】" +
-    order.map((h, i) => `${i + 1}位:${h.num}番(${h.total}点)`).join(" ");
 
   updateScoreControls();
 }
@@ -258,13 +318,14 @@ function renderBet() {
   wrap.className = "table-wrap";
   const table = document.createElement("table");
   table.className = "dense";
-  table.innerHTML = "<thead><tr><th>馬番</th><th>馬名</th><th>印</th><th>単勝</th>" +
-    "<th>購入額</th><th>的中時払戻</th><th>回収率</th><th>損益</th></tr></thead>";
+  table.innerHTML = '<caption class="visually-hidden">買い目: 単勝の保証配分</caption>' +
+    '<thead><tr><th scope="col">馬番</th><th scope="col">馬名</th><th scope="col">印</th><th scope="col">単勝</th>' +
+    '<th scope="col">購入額</th><th scope="col">的中時払戻</th><th scope="col">回収率</th><th scope="col">損益</th></tr></thead>';
   const tbody = document.createElement("tbody");
   for (const r of [...bet.bets].sort((a, b) => a.odds - b.odds)) {
     const profit = r.payout - bet.total;
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${r.num}</td><td class="name">${escapeHtml(r.name)}</td><td>${r.mark}</td>` +
+    tr.innerHTML = `<th scope="row">${r.num}</th><td class="name">${escapeHtml(r.name)}</td><td>${r.mark}</td>` +
       `<td class="amount">${r.odds.toFixed(1)}</td><td class="amount">${fmtYen(r.amount)}</td>` +
       `<td class="amount">${fmtYen(r.payout)}</td>` +
       `<td class="amount">${Math.round(r.roi * 100)}%</td>` +
@@ -369,6 +430,8 @@ function buildResultText() {
 async function loadPdf(arrayBuffer) {
   const errorBox = $("error-box");
   errorBox.hidden = true;
+  $("parse-status").hidden = false;
+  announce("PDFを解析しています");
   document.body.classList.add("busy");
   try {
     const { entries, raceMd } = await convertPdf(pdfjsLib, new Uint8Array(arrayBuffer), PDF_OPTIONS);
@@ -378,9 +441,14 @@ async function loadPdf(arrayBuffer) {
     state.tableBuilt = false;
     recompute();
   } catch (err) {
-    errorBox.textContent = `読み込みに失敗しました: ${err.message}`;
+    errorBox.textContent = "このPDFを読み取れませんでした。JRA公式の出馬表(馬柱)PDFかご確認ください。";
+    const details = document.createElement("details");
+    details.innerHTML = `<summary>技術的な詳細</summary>${escapeHtml(err.message)}`;
+    errorBox.appendChild(details);
     errorBox.hidden = false;
+    announce("PDFを読み取れませんでした");
   } finally {
+    $("parse-status").hidden = true;
     document.body.classList.remove("busy");
   }
 }
@@ -449,11 +517,22 @@ function setup() {
     try {
       await navigator.clipboard.writeText(buildResultText());
       $("copy-btn").textContent = "コピーしました ✓";
+      announce("結果をコピーしました");
       setTimeout(() => { $("copy-btn").textContent = "結果をテキストでコピー"; }, 1500);
     } catch {
       alert("コピーに失敗しました");
     }
   });
+
+  // 前回のレースがあれば復元ボタンを出す
+  const saved = loadSavedSession();
+  if (saved?.entries?.length) {
+    const btn = $("restore-btn");
+    const when = new Date(saved.savedAt ?? Date.now());
+    btn.textContent = `前回のレースを復元(${saved.label ?? "保存データ"} / ${when.getMonth() + 1}/${when.getDate()}保存)`;
+    btn.hidden = false;
+    btn.addEventListener("click", restoreSession);
+  }
 
   // 下部バー: タップで買い目へ移動。買い目カードが画面内にある間は自動で隠す
   $("sb-goto").addEventListener("click", () => {

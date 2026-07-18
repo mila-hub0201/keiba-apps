@@ -148,7 +148,13 @@ main {
 }
 .dropzone-main { margin: 8px 0 4px; font-weight: 600; }
 .dropzone-sub { margin: 0; font-size: 0.78rem; color: var(--text-sub); }
-.upload-actions { text-align: center; margin-top: 10px; }
+.upload-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
 
 .error {
   color: var(--danger);
@@ -156,6 +162,57 @@ main {
   background: color-mix(in srgb, var(--danger) 10%, transparent);
   border-radius: 8px;
   padding: 8px 12px;
+}
+.error details { margin-top: 6px; color: var(--text-sub); font-size: 0.75rem; }
+.error summary { cursor: pointer; }
+
+/* PDF解析中の表示 */
+.parse-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 10px 0 0;
+  font-size: 0.85rem;
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 3px solid var(--accent-soft);
+  border-top-color: var(--accent-strong);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* PDF入手ガイド */
+.pdf-guide {
+  margin-top: 12px;
+  font-size: 0.8rem;
+  color: var(--text-sub);
+}
+.pdf-guide summary {
+  cursor: pointer;
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+.pdf-guide ol { margin: 8px 0 4px; padding-left: 1.4em; }
+.pdf-guide li { margin-bottom: 2px; }
+.pdf-guide p { margin: 4px 0 0; }
+
+/* スクリーンリーダー専用テキスト */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* ── レース情報 ── */
@@ -175,9 +232,14 @@ table.dense th, table.dense td {
   text-align: center;
 }
 table.dense td.amount { text-align: right; }
-table.dense th {
+table.dense thead th {
   /* stickyセルは下の内容が透けないよう不透明色にする */
   background: color-mix(in srgb, var(--accent) 10%, var(--card));
+  font-weight: 600;
+}
+/* 行見出し(馬番)はデータ行の見た目に合わせる */
+table.dense tbody th {
+  background: var(--card);
   font-weight: 600;
 }
 
@@ -196,17 +258,50 @@ table.dense th:nth-child(2), table.dense td:nth-child(2) {
   background: var(--card);
   box-shadow: 2px 0 0 var(--line);
 }
-table.dense th:nth-child(-n+2) {
+table.dense thead th:nth-child(-n+2) {
   background: color-mix(in srgb, var(--accent) 10%, var(--card));
   z-index: 3;
 }
-table.dense tr.top3 td:nth-child(-n+2) {
+table.dense tr.top3 th:nth-child(1),
+table.dense tr.top3 td:nth-child(2) {
   background: color-mix(in srgb, var(--accent) 7%, var(--card));
 }
 table.dense td.name { text-align: left; font-weight: 600; }
 table.dense td.total { font-weight: 700; color: var(--accent-strong); }
-/* 上位3頭は赤ではなくアクセント系の帯で示す(赤は◎と警告に限定) */
-table.dense tr.top3 td { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+/* 上位3頭は赤ではなくアクセント系の帯で示す(赤は◎と警告に限定)。
+   ヒートマップセルは項目自体の濃淡を優先する */
+table.dense tr.top3 th,
+table.dense tr.top3 td:not(.score-cell) {
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+
+/* 採点項目のヒートマップ(--vは0〜1の正規化値) */
+table.dense td.score-cell {
+  background: color-mix(in srgb, var(--accent) calc(var(--v, 0) * 32%), transparent);
+}
+table.dense td.score-cell.neg {
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* 順位列 */
+table.dense td.rank { color: var(--text-sub); }
+table.dense td.rank-top { color: var(--accent-strong); font-weight: 700; }
+
+/* 脚質タグ(馬名の右に小さく表示) */
+.style-tag {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 0.65rem;
+  font-weight: 400;
+  color: var(--text-sub);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0 4px;
+  vertical-align: 1px;
+}
+td.total span[aria-hidden] { margin-left: 2px; color: var(--accent-strong); }
 
 .odds-input {
   width: 4.6em;

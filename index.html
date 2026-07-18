@@ -18,6 +18,8 @@
     <p class="tagline">出馬表PDF → 採点 → 印 → 単勝保証配分</p>
   </header>
 
+  <p id="live-status" role="status" aria-live="polite" class="visually-hidden"></p>
+
   <main>
     <!-- PDF読み込み -->
     <section class="card" id="upload-card">
@@ -28,9 +30,23 @@
         <p class="dropzone-sub">JRA形式の出馬表・馬柱PDF(1レース1ファイル)</p>
         <input type="file" id="file-input" accept="application/pdf,.pdf" hidden>
       </div>
+      <p class="parse-status" id="parse-status" hidden>
+        <span class="spinner" aria-hidden="true"></span>PDFを解析しています…(数秒かかります)
+      </p>
       <div class="upload-actions">
+        <button class="btn btn-ghost" id="restore-btn" type="button" hidden></button>
         <button class="btn btn-ghost" id="demo-btn" type="button">デモデータで試す</button>
       </div>
+      <details class="pdf-guide">
+        <summary>出馬表PDFの入手方法</summary>
+        <ol>
+          <li>スマホでJRA公式サイト(jra.go.jp)の「出馬表」を開く</li>
+          <li>対象レースを選び、「出馬表(PDF)」リンクを開く</li>
+          <li>ダウンロード(または共有 → 保存)する</li>
+          <li>このアプリの選択ボタンから保存したPDFを選ぶ</li>
+        </ol>
+        <p>netkeiba等のPDFはレイアウトが異なるため読み取れない場合があります。</p>
+      </details>
       <p class="error" id="error-box" hidden></p>
     </section>
 
@@ -47,7 +63,6 @@
       <div class="table-wrap">
         <table id="score-table" class="dense"></table>
       </div>
-      <p class="rank-line" id="rank-line"></p>
     </section>
 
     <!-- 印・自信度 -->
