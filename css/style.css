@@ -2,16 +2,22 @@
 
 :root {
   --accent: #0ea5e9;
-  --accent-strong: #0284c7;
+  /* テキスト用アクセントはAA(4.5:1)を満たす暗さにする(白背景で5.9:1) */
+  --accent-strong: #0369a1;
   --accent-soft: rgba(14, 165, 233, 0.12);
+  /* アクセント色の上に載せる文字色(ライト=白/ダーク=紺) */
+  --on-accent: #ffffff;
+  --btn-from: #0369a1;
+  --btn-to: #075985;
   --bg: #f5f8fa;
   --card: #ffffff;
   --text: #1e293b;
-  --text-sub: #64748b;
-  --line: #e2e8f0;
+  --text-sub: #475569;
+  --line: #cbd5e1;
   --danger: #dc2626;
-  --ok: #059669;
-  --mark-hon: #dc2626;
+  --ok: #047857;
+  /* 本命◎は警告の朱赤と区別できる深紅にする */
+  --mark-hon: #be123c;
   --shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   color-scheme: light dark;
 }
@@ -21,6 +27,9 @@
     --accent: #38bdf8;
     --accent-strong: #7dd3fc;
     --accent-soft: rgba(56, 189, 248, 0.14);
+    --on-accent: #0b1220;
+    --btn-from: #38bdf8;
+    --btn-to: #7dd3fc;
     --bg: #0b1220;
     --card: #131c2e;
     --text: #e2e8f0;
@@ -28,7 +37,7 @@
     --line: #263449;
     --danger: #f87171;
     --ok: #34d399;
-    --mark-hon: #f87171;
+    --mark-hon: #fb7185;
     --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
   }
 }
@@ -40,11 +49,26 @@
 
 body {
   margin: 0;
-  font-family: "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic UI", "Meiryo", sans-serif;
+  /* Yu Gothic UIはWindowsで細く淡く出るため除外。BIZ UDPGothicはWin10標準搭載 */
+  font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "BIZ UDPGothic",
+               "Noto Sans JP", "Meiryo", sans-serif;
   background: var(--bg);
   color: var(--text);
   line-height: 1.6;
   padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* 数字は等幅にして桁を縦に揃える */
+table.dense, .stat-value, .odds-input, .bet-total-line, .rank-line,
+.settings-grid input, .mark-row .mk-pts {
+  font-variant-numeric: tabular-nums;
+}
+
+/* フォーカスの可視化(マウス以外の操作時) */
+.dropzone:focus-visible, .odds-input:focus-visible, .pad-btn:focus-visible,
+.settings-grid input:focus-visible, .btn:focus-visible, summary:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 2px;
 }
 
 main {
@@ -68,14 +92,12 @@ main {
   gap: 10px;
 }
 .logo-mark {
-  display: inline-grid;
-  place-items: center;
   width: 38px;
   height: 38px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
-  color: #fff;
-  font-size: 1.2rem;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 0 0 2px var(--accent-soft), 0 0 0 1px var(--line);
+  background: #feefde; /* イラストの地色。読み込み中のプレースホルダー */
 }
 .tagline {
   margin: 4px 0 0;
@@ -116,9 +138,14 @@ main {
 .dropzone:hover, .dropzone:focus-visible, .dropzone.dragover {
   border-color: var(--accent);
   background: var(--accent-soft);
-  outline: none;
 }
-.dropzone-icon { font-size: 2rem; }
+.dropzone-icon img {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
 .dropzone-main { margin: 8px 0 4px; font-weight: 600; }
 .dropzone-sub { margin: 0; font-size: 0.78rem; color: var(--text-sub); }
 .upload-actions { text-align: center; margin-top: 10px; }
@@ -144,9 +171,10 @@ table.dense {
 }
 table.dense th, table.dense td {
   border-bottom: 1px solid var(--line);
-  padding: 5px 7px;
+  padding: 6px 8px;
   text-align: center;
 }
+table.dense td.amount { text-align: right; }
 table.dense th {
   background: var(--accent-soft);
   font-weight: 600;
@@ -155,23 +183,26 @@ table.dense th {
 }
 table.dense td.name { text-align: left; font-weight: 600; }
 table.dense td.total { font-weight: 700; color: var(--accent-strong); }
-table.dense tr.top3 td.total { color: var(--mark-hon); }
+/* 上位3頭は赤ではなくアクセント系の帯で示す(赤は◎と警告に限定) */
+table.dense tr.top3 td { background: color-mix(in srgb, var(--accent) 7%, transparent); }
 
 .odds-input {
-  width: 4.2em;
-  padding: 2px 4px;
-  border: 1px solid var(--line);
+  width: 4.6em;
+  min-height: 38px;
+  padding: 4px 6px;
+  border: 1px solid color-mix(in srgb, var(--text-sub) 55%, transparent);
   border-radius: 6px;
   background: transparent;
   color: inherit;
   font: inherit;
   text-align: right;
 }
-.odds-input:focus { border-color: var(--accent); outline: none; }
+.odds-input:focus { border-color: var(--accent-strong); }
 
 .pad-btn {
-  min-width: 2.2em;
-  padding: 2px 6px;
+  min-width: 42px;
+  min-height: 38px;
+  padding: 4px 8px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: transparent;
@@ -225,8 +256,8 @@ table.dense tr.top3 td.total { color: var(--mark-hon); }
   border-radius: 50%;
   font-size: 1.05rem;
   font-weight: 700;
-  color: #fff;
-  background: var(--accent);
+  color: var(--on-accent);
+  background: var(--accent-strong);
 }
 .conf-badge.conf-A { background: var(--ok); }
 .conf-badge.conf-C { background: var(--danger); }
@@ -254,7 +285,7 @@ table.dense tr.top3 td.total { color: var(--mark-hon); }
   color: inherit;
   font: inherit;
 }
-.settings-grid input:focus { border-color: var(--accent); outline: none; }
+.settings-grid input:focus { border-color: var(--accent-strong); }
 
 /* ── 買い目 ── */
 .bet-stats {
@@ -306,8 +337,8 @@ table.dense tr.top3 td.total { color: var(--mark-hon); }
 }
 .btn:active { filter: brightness(0.92); }
 .btn-primary {
-  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
-  color: #fff;
+  background: linear-gradient(135deg, var(--btn-from), var(--btn-to));
+  color: var(--on-accent);
   flex: 1;
 }
 .btn-ghost {
@@ -324,6 +355,14 @@ table.dense tr.top3 td.total { color: var(--mark-hon); }
   font-size: 0.7rem;
   color: var(--text-sub);
   text-align: center;
+}
+.footer-mark {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+  opacity: 0.9;
+  margin-bottom: 4px;
 }
 
 /* 処理中 */

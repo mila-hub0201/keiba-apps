@@ -61,6 +61,9 @@ function fmtOdds(o) {
 function fmtPop(p) {
   return p === 99 ? "—" : `${p}`;
 }
+function fmtYen(n) {
+  return `${Math.round(n).toLocaleString("ja-JP")}円`;
+}
 
 function renderRace() {
   const r = state.score.race;
@@ -70,6 +73,7 @@ function renderRace() {
 }
 
 const PAD_CYCLE = ["", "◎", "〇", "▲", "△"];
+const PAD_NAMES = { "": "指定なし", "◎": "本命", "〇": "対抗", "▲": "単穴", "△": "連下" };
 
 function renderScore() {
   const table = $("score-table");
@@ -95,16 +99,19 @@ function renderScore() {
     oddsInput.value = h.odds ?? "";
     oddsInput.placeholder = "—";
     oddsInput.setAttribute("aria-label", `${h.num}番の単勝オッズ`);
+    oddsInput.addEventListener("focus", () => oddsInput.select());
     oddsInput.addEventListener("change", () => {
       const e = state.entries.find((x) => String(x.horse_number).replace(/[^0-9]/g, "") === String(h.num));
       if (e) { e.odds = oddsInput.value.trim(); recompute(); }
     });
 
+    const padMark = state.paddock[h.num] ?? "";
     const padBtn = document.createElement("button");
     padBtn.type = "button";
-    padBtn.className = "pad-btn" + (state.paddock[h.num] ? " active" : "");
-    padBtn.textContent = state.paddock[h.num] || "－";
-    padBtn.setAttribute("aria-label", `${h.num}番のパドック評価`);
+    padBtn.className = "pad-btn" + (padMark ? " active" : "");
+    padBtn.textContent = padMark || "－";
+    padBtn.setAttribute("aria-label",
+      `${h.num}番${h.name}のパドック評価: ${PAD_NAMES[padMark]}。押すと次の評価に切り替え`);
     padBtn.addEventListener("click", () => {
       const cur = PAD_CYCLE.indexOf(state.paddock[h.num] ?? "");
       const next = PAD_CYCLE[(cur + 1) % PAD_CYCLE.length];
@@ -223,9 +230,10 @@ function renderBet() {
     const profit = r.payout - bet.total;
     const tr = document.createElement("tr");
     tr.innerHTML = `<td>${r.num}</td><td class="name">${escapeHtml(r.name)}</td><td>${r.mark}</td>` +
-      `<td>${r.odds.toFixed(1)}</td><td>${r.amount}円</td><td>${Math.round(r.payout)}円</td>` +
-      `<td>${Math.round(r.roi * 100)}%</td>` +
-      `<td class="${profit >= 0 ? "profit-plus" : ""}">${profit >= 0 ? "+" : ""}${Math.round(profit)}円</td>`;
+      `<td class="amount">${r.odds.toFixed(1)}</td><td class="amount">${fmtYen(r.amount)}</td>` +
+      `<td class="amount">${fmtYen(r.payout)}</td>` +
+      `<td class="amount">${Math.round(r.roi * 100)}%</td>` +
+      `<td class="amount ${profit >= 0 ? "profit-plus" : ""}">${profit >= 0 ? "+" : "−"}${fmtYen(Math.abs(profit))}</td>`;
     tbody.appendChild(tr);
   }
   table.appendChild(tbody);
@@ -234,15 +242,15 @@ function renderBet() {
 
   const totalLine = document.createElement("p");
   totalLine.className = "bet-total-line";
-  totalLine.textContent = `投資合計 ${bet.total}円 / 候補${bet.bets.length}頭 / 自信度${bet.confidence}`;
+  totalLine.textContent = `投資合計 ${fmtYen(bet.total)} / 候補${bet.bets.length}頭 / 自信度${bet.confidence}`;
   body.appendChild(totalLine);
 
   const guarantee = document.createElement("p");
   guarantee.className = "bet-note";
   guarantee.textContent =
-    `→ 候補のどれが勝っても ${bet.min_profit >= 0 ? "+" : ""}${Math.round(bet.min_profit)}円以上` +
+    `→ 候補のどれが勝っても +${fmtYen(bet.min_profit)}以上` +
     `(回収率 ${Math.round(bet.min_roi * 100)}%〜${Math.round(bet.max_roi * 100)}%)。` +
-    `候補外の馬が勝てば -${bet.total}円(全損)。`;
+    `候補外の馬が勝てば −${fmtYen(bet.total)}(全損)。`;
   body.appendChild(guarantee);
 
   const caution = document.createElement("p");
