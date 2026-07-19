@@ -243,17 +243,21 @@ table.dense tbody th {
   font-weight: 600;
 }
 
-/* 馬番・馬名列を左固定: 横スクロール中も行の同定を可能にする */
+/* 馬番・馬名列を左固定: 横スクロール中も行の同定を可能にする。
+   馬番列は幅を56pxちょうどに固定し、馬名列のleftと一致させる
+   (ズレると隙間から下のセルが透けて見える) */
 table.dense th:nth-child(1), table.dense td:nth-child(1) {
   position: sticky;
   left: 0;
   z-index: 2;
   background: var(--card);
-  min-width: 40px;
+  width: 56px;
+  min-width: 56px;
+  max-width: 56px;
 }
 table.dense th:nth-child(2), table.dense td:nth-child(2) {
   position: sticky;
-  left: 56px; /* 馬番列の幅(min-width 40px + padding 16px) */
+  left: 56px; /* 馬番列の固定幅と同値にすること */
   z-index: 2;
   background: var(--card);
   box-shadow: 2px 0 0 var(--line);
@@ -262,10 +266,6 @@ table.dense thead th:nth-child(-n+2) {
   background: color-mix(in srgb, var(--accent) 10%, var(--card));
   z-index: 3;
 }
-table.dense tr.top3 th:nth-child(1),
-table.dense tr.top3 td:nth-child(2) {
-  background: color-mix(in srgb, var(--accent) 7%, var(--card));
-}
 table.dense td.name { text-align: left; font-weight: 600; }
 table.dense td.total { font-weight: 700; color: var(--accent-strong); }
 /* 上位3頭は赤ではなくアクセント系の帯で示す(赤は◎と警告に限定)。
@@ -273,6 +273,12 @@ table.dense td.total { font-weight: 700; color: var(--accent-strong); }
 table.dense tr.top3 th,
 table.dense tr.top3 td:not(.score-cell) {
   background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+/* 左固定の馬番・馬名セルは透過だと下のセルが透けるため、上の半透明指定より
+   後に書いて不透明色で上書きする */
+table.dense tr.top3 th:nth-child(1),
+table.dense tr.top3 td:nth-child(2) {
+  background: color-mix(in srgb, var(--accent) 7%, var(--card));
 }
 
 /* 採点項目のヒートマップ(--vは0〜1の正規化値) */
